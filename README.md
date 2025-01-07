@@ -238,7 +238,7 @@ cp /mnt/cdrom/install.amd/vmlinuz /srv/share/www/debian12/netboot/debian-install
 #создание каталогов, поиск и копирование пакетов
 #каталог в который уже скопировали пакеты для репозитория /srv/share/www/debian12/cache
 mkdir /srv/share/www/debian12/repo/conf
-#!!!создаем файл с конфигурацией, SignWith берем из пункта создания подписи, в конце пункта 9 данной инструкции !!!
+#!!!создаем файл с конфигурацией, SignWith берем из пункта создания подписи, ID нашего ключа, в конце пункта 9 данной инструкции !!!
 nano /srv/share/www/debian12/repo/conf/distributions
 #текст ниже
 Origin: Debian
@@ -252,7 +252,7 @@ UDebComponents:main contrib non-free-firmware
 Description: Apt repository for project DebianRepo
 SignWith: 28E9A2D344FF7A86082A56616195B3635B1275C8
 #
-#Инициализация репозитория,reprepro создаст необходимые каталоги и файлы, потребуется пароль от ключа который создавали qwert
+#Инициализация репозитория,reprepro создаст необходимые каталоги и файлы, потребуется пароль от ключа который создавали - qwert
 reprepro -b /srv/share/www/debian12/repo export bookworm
 #выгрузка ключа для подписи репозитория
 gpg --yes --armor -o /srv/share/www/debian12/repo/dists/bookworm/Release.gpg -sb /srv/share/www/debian12/repo/dists/bookworm/Release
@@ -266,13 +266,13 @@ ln -s /srv/share/www/debian12/repo/dists/bookworm /srv/share/www/debian12/repo/d
 #Обновить файл с контрольными суммами
 cd /srv/share/www/debian12/repo
 find ! -name md5sum.txt ! -name gostsums.txt -follow -type f -print0 | xargs -0 md5sum > md5sum.txt ;
-#объявляем владельцем каталога на www-data
+#объявляем владельцем каталогов www-data
 chown -R www-data:www-data /srv/share/www
 #для проверки подписи репозитория нашим ключем и объединенным нужно выполнить команды
 gpg --no-default-keyring --keyring /srv/share/www/debian12/public.pgp --verify /srv/share/www/debian12/repo/dists/bookworm/Release.gpg /srv/share/www/debian12/repo/dists/bookworm/Release
 gpg --no-default-keyring --keyring /srv/share/www/debian12/debian-archive-keyring.gpg --verify /srv/share/www/debian12/repo/dists/bookworm/Release.gpg /srv/share/www/debian12/repo/dists/bookworm/Release
 #########################################################################################################
-12) файл ответов и файл boot.ipxe
+12) Файл boot.ipxe и файлы ответов
 #сначала создаем boot.ipxe в /srv/share/ipxe/config
 cd /srv/share/ipxe/config
 nano /srv/share/ipxe/config/boot.ipxe
@@ -290,7 +290,7 @@ item     Load_disk                      Load disk
 item
 item --gap --                   ------------------------- Operating systems ------------------------------
 item
-item	  debian12_8_bookworm_cli		      Debian 12.8 BookWorm CLI
+item	   debian12_8_bookworm_cli		       Debian 12.8 BookWorm CLI
 item    debian12_8_bookworm_gnome       Debian 12.8 BookWorm GNOME
 item
 item --gap --                   ------------------------- Operating systems ------------------------------
@@ -349,8 +349,8 @@ goto start
 #генерация ssh ключа для вставки в файл ответов, если хотим подключаться к машинам без пароля, выполнить на том ПК с которого хотим получать доступ.
 ssh-keygen -t ed25519
 # далее берем сгенерированный открытый ключ из файла, добавляем ключ в файлы ответов в строку d-i preseed/late_command string
-## далее файл ответов
-# первый файл ответов для установки без GUI
+## далее файлы ответов
+# первый файл ответов для установки без GUI, серверный вариант
 cd /srv/share/www/debian12
 nano /srv/share/www/debian12/preseed-install-cli.cfg
 #текст ниже
@@ -568,7 +568,7 @@ d-i clock-setup/ntp boolean false
 # работа с дисками
 d-i partman-auto/method string lvm
 d-i partman-auto-lvm/guided_size string max
-#. Это можно предварительно удалить...
+# Предварительное удаление...
 d-i partman-lvm/device_remove_lvm boolean true
 # То же самое относится и к ранее существовавшему программному RAID-массиву:
 d-i partman-md/device_remove_md boolean true
@@ -636,7 +636,8 @@ in-target sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config; \
 in-target sh -c "echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpW2MP5VcpU7TIrPT6Fudf0sywcdE9buf9S0joK3s92 root@testpxe' > /root/.ssh/authorized_keys";
 
 ################################################################################################################
-13) создаем виртуальную машину и тестируем
+13) Создаем виртуальную машину, в настройках указываем загрузку с сетевой карты, и тестируем. Файлы ответов предназначены для установки на машины с EFI!!! Для установки с BIOS Legacy необходимо в файлах ответах закоментировать строки относящиеся к EFI в разделе # работа с дисками.
+ ВНИМАНИЕ!!! Во время установки, на этапе инициализации APT будет ругаться что не может подключится к репозиторию, на этом этапе еще не выполнился скрипт по добавлению созданного нами ключа которым подписан репозиторий. Нажимаем продолжить, установка с репозитория продолжится!
 14) После установки закоментировать ненужные строки в файле списка репозиториев /etc/apt/sources.list, оставить только свой сетевой репозиторий или добавить по необходимости репы яндекса.
 
 ```
