@@ -12,13 +12,13 @@
 
 1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
 cat > /etc/network/interfaces <<EOF
-# This file describes the network interfaces available on your system1
-# and how to activate them. For more information, see interfaces(5).
+#This file describes the network interfaces available on your system1
+#and how to activate them. For more information, see interfaces(5).
 source /etc/network/interfaces.d/*
-# The loopback network interface
+#The loopback network interface
 auto lo
 iface lo inet loopback
-# The primary network interface для просмотра имени интерфейса ip a
+#The primary network interface для просмотра имени интерфейса ip a
 allow-hotplug enp6s18
 iface enp6s18 inet static
 address 192.168.2.4
