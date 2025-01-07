@@ -1,17 +1,20 @@
 # Debian-iPXE Сетевая установка Debian Bookworm из локального репозитория созданного из iso образа DVD диска.
-# Не претендую на первоисточник, но в интернете не нашел полноценной инструкции для развертывания сервера iPXE для установки Debian Bookworm с репозитория развернутого в локальной сети.
-# Главное условие, репозиторий должен быть создан из iso образа DVD диска.
-# Мой стенд, Proxmox -> изолированная сеть -> Виртуальные машины 1) Proxy Squid - для доступа к интернету за пределами тестового стенда. 2) Непосредственно тестовый сервер для iPXE. 
-# Установка iPXE будет поддерживать как EFi так и BIOS Legacy
-# Устанавливаем на виртуальныю машину Debian Bookworm c iso образа https://cdimage.debian.org/cdimage/release/current/amd64/iso-dvd/debian-12.8.0-amd64-DVD-1.iso
-# Далее этот образ нам понадобится для создания нашего репозитория.
-# В данной инстуркции будут использованы 2 ip адреса
-# 192.168.2.2 - прокси сервер для доступа в интернет, необходим для установки пакетов и обновлений во время настройки ipxe.
-# 192.168.2.4 - непосредственно наш будущий iPXE сервер
-# Приступим к настройке iPXE на нашей чситой установки Debian Bookworm!
+ Не претендую на первоисточник, но в интернете не нашел полноценной инструкции для развертывания сервера iPXE для установки Debian Bookworm из репозитория в локальной сети.
+ Главное условие, репозиторий должен быть создан из iso образа DVD диска.
+ Мой стенд, Proxmox -> изолированная сеть -> Виртуальные машины 
+ 1. Proxy Squid - для доступа к интернету за пределами тестового стенда.
+ 2. Непосредственно тестовый сервер для iPXE.
+    
+ Установка iPXE будет поддерживать как EFI так и BIOS Legacy
+ Устанавливаем на виртуальныю машину Debian Bookworm c iso образа https://cdimage.debian.org/cdimage/release/current/amd64/iso-dvd/debian-12.8.0-amd64-DVD-1.iso
+ Далее этот образ нам понадобится для создания нашего репозитория.
+ В данной инстуркции будут использованы 2 ip адреса
+ 192.168.2.2 - прокси сервер для доступа в интернет, необходим для установки пакетов и обновлений во время настройки ipxe.
+ 192.168.2.4 - непосредственно наш будущий iPXE сервер
+ Приступим к настройке iPXE на нашей чситой установки Debian Bookworm!
 
-# 1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
 ```
+1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
 cat > /etc/network/interfaces <<EOF
 #This file describes the network interfaces available on your system1
 #and how to activate them. For more information, see interfaces(5).
@@ -27,8 +30,7 @@ netmask 255.255.255.0
 gateway 192.168.2.2
 EOF
 ###########################################################################
-```
-# 2) Далее прописываем настройки нашего прокси для apt
+2) Далее прописываем настройки нашего прокси для apt
 cat > \etc\apt\apt.conf <<EOF
 Acquire::http::proxy "http://192.168.2.2:3128";
 Acquire::https::proxy "http://192.168.2.2:3128";
@@ -40,16 +42,15 @@ cat > /etc/profile.d/proxy.sh <<EOF
 export http_proxy="http://192.168.2.2:3128/"
 export https_proxy="http://192.168.2.2:3128/"
 EOF
-echo "Делаем файл proxy.sh исполняемым"
+#Делаем файл proxy.sh исполняемым
 chmod +x /etc/profile.d/proxy.sh
-echo "Запускаем proxy.sh"
+#Запускаем proxy.sh
 . /etc/profile.d/proxy.sh
-echo "Проверяем системные прокси"
+#Проверяем системные прокси
 env | grep -i proxy
 ########################################################################
-# 3)Правим списки репозиториев
+3)Правим списки репозиториев, добавляем репы яндекса для книжного червя
 cat >/etc/apt/sources.list<<EOF
-#добавляем репы яндекса для книжного червя
 deb http://mirror.yandex.ru/debian/ bookworm main
 deb-src http://mirror.yandex.ru/debian/ bookworm main
 deb http://mirror.yandex.ru/debian-security bookworm-security main contrib
@@ -57,21 +58,20 @@ deb-src http://mirror.yandex.ru/debian-security bookworm-security main contrib
 deb http://mirror.yandex.ru/debian/ bookworm-updates main contrib
 deb-src http://mirror.yandex.ru/debian/ bookworm-updates main contrib
 EOF
-#
 #запускаем 
 apt update  
 ##################################################################
-# 4) Установка необходимого ПО для iPXE
+4) Установка необходимого ПО для iPXE
 apt install -y dnsmasq nfs-kernel-server rsync git gcc make perl liblzma-dev mtools apache2 reprepro gpg
 ###########################################################
-# 5) создание каталогов для ipxe/tftp+nfs+apache
+5) создание каталогов для ipxe/tftp+nfs+apache
 mkdir -p /srv/share/{ipxe,nfs,www}
-echo "настройка NFS Добавляем конфигурацию в конец файла /etc/exports" NFS добавил для будущей поддержки других дистрибутивов Linux.
+#настройка NFS Добавляем конфигурацию в конец файла /etc/exports" NFS добавил для будущей поддержки других дистрибутивов Linux.
 echo "/srv/share/nfs *(rw,sync,no_wdelay,insecure_locks,no_root_squash,insecure,no_subtree_check)" >> /etc/exports
-#echo "Перезапуск демона nfs-kernel-server" или можно выполнить exportfs -av
+#Перезапуск демона nfs-kernel-server или можно выполнить exportfs -av
 systemctl restart nfs-kernel-server
 ############################################################
-# 6)Конфигурация файла  /etc/dnsmasq.conf interface=enp6s18 необходимо указать актуальный сетевой интерфейс, посмотреть можно выполнив ip a или ip l
+6)Конфигурация файла  /etc/dnsmasq.conf interface=enp6s18 необходимо указать актуальный сетевой интерфейс, посмотреть можно выполнив ip a или ip l
 cp /etc/dnsmasq.conf /etc/dnsmasq.conf.backup
 cat > /etc/dnsmasq.conf <<EOF
 interface=enp6s18
@@ -94,7 +94,7 @@ EOF
 #Перезапускаем dnsmasq
 systemctl restart dnsmasq
 ##############################################################
-# 7)настройка apache2
+7)настройка apache2
 cat > /etc/apache2/sites-available/debpxe.conf <<EOF
 <VirtualHost *:80>
   ServerAdmin webmaster@localhost
@@ -108,15 +108,15 @@ cat > /etc/apache2/sites-available/debpxe.conf <<EOF
   CustomLog ${APACHE_LOG_DIR}/DebPXEaccess.log combined
 </VirtualHost>
 EOF
-#отключение дефолтной и включени нашей конфигурации + перезапуск демона apache2
-#(Выключайм конфигурацию по умолчанию)
+#отключение дефолтной и включение нашей конфигурации, перезапуск apache2
+#Выключайм конфигурацию по умолчанию
 a2dissite 000-default.conf 
 #включаем нашу конфигурацию (если ошибка то создаем ссылку ln -s /etc/apache2/sites-available/debpxe.conf  /etc/apache2/sites-enabled/debpxe.conf после a2ensite debpxe.conf)
 a2ensite debpxe.conf 
 systemctl reload apache2
 #для проверки синтаксиса нашего файла конфигурации выполнить apache2ctl -t
 ##########################################################
-# 8) установка и настройка iPXE. Клонируем проект с github
+8) Установка и настройка iPXE. Клонируем проект с github
 #т.к. каталог для tftp /srv/share/ipxe создаем каталоги конфигурации для ipxe
 mkdir -p /srv/share/ipxe/{config,firmware}
 mkdir /srv/tmp
@@ -160,19 +160,17 @@ cd /srv/tmp/ipxe/src
 make bin/ipxe.pxe bin/undionly.kpxe bin/undionly.kkpxe bin/undionly.kkkpxe bin-x86_64-efi/ipxe.efi EMBED=bootconfig.ipxe
 #Копируем файлы для ipxe
 cp -v bin/{ipxe.pxe,undionly.kpxe,undionly.kkpxe,undionly.kkkpxe} bin-x86_64-efi/ipxe.efi /srv/share/ipxe/firmware
-##########################################################################
 ######################################################################
 9) работа с ISO,пакетами для репозитория и подпиью
-
-# необходим iso образ, создать подпись для репозитория
-# создаем каталог для хранения пакетов для перозитория
+# необходим iso образ, создать подпись для репозитория,
+# создаем каталог для хранения пакетов для перозитория.
 mkdir -p /srv/share/www/debian12/{cache,conf,repo}
 # копируем образ с другово ПК (у меня лежит на 192.168.2.2) себе в srv
 scp root@192.168.2.2:/srv/apache2/iso/debian-12.8.0-amd64-DVD-1.iso /srv
 # создаем каталог для монтирования и монтируем образ
 mkdir /mnt/cdrom
 mount -o loop /srv/debian-12.8.0-amd64-DVD-1.iso /mnt/cdrom
-# Копируем пакеты во временный каталог  .deb и .udeb
+# Копируем пакеты .deb и .udeb во временный каталог  
 find /mnt/cdrom/pool -type f -name "*.deb" -print -exec cp {} /srv/share/www/debian12/cache \;
 find /mnt/cdrom/pool -type f -name "*.udeb" -print -exec cp {} /srv/share/www/debian12/cache \;
 # создаем подпись для репозитория  указываем пароль qwert отвечаем на кучу вопросов и получаем заветный key-id который копируем в последнюю строку файла SignWith: 28E9A2D344FF7A86082A56616195B3635B1275C8
@@ -185,13 +183,14 @@ gpg --batch --pinentry-mode=loopback --passphrase "qwert" --quick-generate-key "
 # apt-key list - список ключей установленных в системе
 # экспорт открытого ключа из закрытого ключа по его ID, ID можно узнать предыдущими закомментироваными командами
 gpg --output /srv/share/www/debian12/public.pgp --export 28E9A2D344FF7A86082A56616195B3635B1275C8
+#запоминаем пароль и ID ключа, необходимо для пункта 11 данной инструкции.
 ###########################################################################
-10) работа с initrd
-# создаем каталоги для хранения initrd образов
+10)Работа с initrd
+#создаем каталоги для хранения initrd образов
 mkdir -p /srv/init/{dvd,netboot,dvdz,netbootz}
 mkdir /srv/share/www/debian12/netboot
 cd /srv/share/www/debian12/netboot
-# загрузка netboot gtk с графическим интерфейсом и распаковка
+#загрузка netboot gtk с красивой графикой и распаковка
 wget http://ftp.debian.org/debian/dists/bookworm/main/installer-amd64/20230607+deb12u8/images/netboot/gtk/netboot.tar.gz
 tar -xzvf netboot.tar.gz
 mv /srv/share/www/debian12/netboot/netboot.tar.gz /srv/init/
@@ -199,47 +198,49 @@ cp /srv/share/www/debian12/netboot/debian-installer/amd64/initrd.gz /srv/init/ne
 cd /srv/init/netboot/
 gzip -dc initrd.gz | cpio -i
 mv /srv/init/netboot/initrd.gz /srv/init/initrd.gz.netboot
-# копируем initrd с ISO с графическим интерфейсом и распаковка
+#копируем initrd с ISO с графическим интерфейсом и распаковка
 cp /mnt/cdrom/install.amd/gtk/initrd.gz /srv/init/dvd
 cd /srv/init/dvd
 gzip -dc initrd.gz | cpio -i
 mv /srv/init/dvd/initrd.gz /srv/init/initrd.gz.dvd
-# копирование драйверов из образа initrd ISO в образ initrd netboot
-# Далее сравниваем список драйверов или еще какие изменения.
+#копирование драйверов из образа initrd ISO в образ initrd netboot
+#Далее сравниваем список драйверов, если есть желание.
 ls /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/
 ls /srv/init/netboot/lib/modules/6.1.0-27-amd64/kernel/drivers/
-# что надо копируем, если не определяются диски то копируем драйвера из initrd находящегося на dvd в initrd из netboot
-# Присмотреться к /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/scsi/ посмотреть содержимое в обоих initrd.gz
-# Присмотреться к /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/fs посмотреть содержимое в обоих initrd.gz
+#что надо копируем, если не определяются диски то копируем драйвера из initrd находящегося на dvd в initrd из netboot
+#Присмотреться к /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/scsi/ посмотреть содержимое в обоих initrd.gz
+#Присмотреться к /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/fs посмотреть содержимое в обоих initrd.gz
+#следующие команды скопируют необходимое из initrd DVD на initrd из netboot
 cp -r -u -n /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/fs/* /srv/init/netboot/lib/modules/6.1.0-27-amd64/kernel/fs
 cp -r -n -u /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/* /srv/init/netboot/lib/modules/6.1.0-27-amd64/kernel/drivers/
-# для проверки разницы файлов можно воспользоваться следующей комендой
-# diff -r /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/ /srv/init/netboot/lib/modules/6.1.0-27-amd64/kernel/drivers/
-# сейчас объединяем нашу подпись для репозитория с имеющейся на initrd на netboot
-# объединение 2х файлов публичных ключей.  public.pgp (/srv/share/www/debian12/public.pgp) + debian-archive-keyring.gpg (находящегося в /srv/init/netboot/usr/share/keyrings/)
+#для проверки разницы файлов можно воспользоваться следующей командой
+#diff -r /srv/init/dvd/lib/modules/6.1.0-27-amd64/kernel/drivers/ /srv/init/netboot/lib/modules/6.1.0-27-amd64/kernel/drivers/
+#сейчас объединяем нашу подпись для репозитория с имеющейся на initrd на netboot
+#объединение 2х файлов публичных ключей.  public.pgp (/srv/share/www/debian12/public.pgp) + debian-archive-keyring.gpg (находящегося в /srv/init/netboot/usr/share/keyrings/)
 mv /srv/init/netboot/usr/share/keyrings/debian-archive-keyring.gpg /srv/init/netboot/usr/share/keyrings/debian-archive-keyring.gpg.orgn
 cat /srv/share/www/debian12/public.pgp /srv/init/netboot/usr/share/keyrings/debian-archive-keyring.gpg.orgn > /srv/init/netboot/usr/share/keyrings/debian-archive-keyring.gpg
-# дополнительно копируем получившийся файл в директорию для доступа по http 
+#дополнительно копируем получившийся файл в директорию для доступа по http 
 cp /srv/init/netboot/usr/share/keyrings/debian-archive-keyring.gpg /srv/share/www/debian12 
-# для запаковки initrd обратно  выполняем команды
-# если необходимо для dvd запаковать, но это не надо.
-# cd /srv/init/dvd/
-# find .|cpio -H newc -o|gzip -9 > /srv/init/dvdz/initrd.gz - запаковка
-# для netboot
+#для запаковки initrd обратно  выполняем команды
+#если необходимо для dvd запаковать, но это не надо.
+#cd /srv/init/dvd/
+#find .|cpio -H newc -o|gzip -9 > /srv/init/dvdz/initrd.gz - запаковка
+#для netboot
 cd /srv/init/netboot/
 find .|cpio -H newc -o|gzip -9 > /srv/init/netbootz/initrd.gz
 mv /srv/share/www/debian12/netboot/debian-installer/amd64/initrd.gz /srv/share/www/debian12/netboot/debian-installer/amd64/initrd.gz.orgn
 cp /srv/init/netbootz/initrd.gz /srv/share/www/debian12/netboot/debian-installer/amd64/
-# ядро копируем с DVD диска /mnt/cdrom/install.amd/vmlinuz
+#образ ядра копируем с DVD диска /mnt/cdrom/install.amd/vmlinuz
 cp /mnt/cdrom/install.amd/vmlinuz /srv/share/www/debian12/netboot/debian-installer/amd64/
 ###############################################################################################
 11) настройка репозитория.
-# создание репозитория 
-# создание каталогов, поиск и копирование пакетов
-# каталог в который уже скопировали пакеты для репозитория /srv/share/www/debian12/cache
+#создание репозитория 
+#создание каталогов, поиск и копирование пакетов
+#каталог в который уже скопировали пакеты для репозитория /srv/share/www/debian12/cache
 mkdir /srv/share/www/debian12/repo/conf
-# !!!создаем файл с конфигурацией, SignWith берем из пункта создания подписи!!!
+#!!!создаем файл с конфигурацией, SignWith берем из пункта создания подписи, в конце пункта 9 данной инструкции !!!
 nano /srv/share/www/debian12/repo/conf/distributions
+#текст ниже
 Origin: Debian
 Label: Debian
 Suite: stable
@@ -250,32 +251,32 @@ Components:main contrib non-free-firmware
 UDebComponents:main contrib non-free-firmware
 Description: Apt repository for project DebianRepo
 SignWith: 28E9A2D344FF7A86082A56616195B3635B1275C8
-
-# Инициализация репозитория,reprepro создаст необходимые каталоги и файлы релиза, потребуется пароль от ключа который создавали qwert
+#
+#Инициализация репозитория,reprepro создаст необходимые каталоги и файлы, потребуется пароль от ключа который создавали qwert
 reprepro -b /srv/share/www/debian12/repo export bookworm
-# выгрузка ключа для подписи репозитория
+#выгрузка ключа для подписи репозитория
 gpg --yes --armor -o /srv/share/www/debian12/repo/dists/bookworm/Release.gpg -sb /srv/share/www/debian12/repo/dists/bookworm/Release
-# заполнить репозиторий пакетами из iso образа скопированными в /srv/share/www/debian12/cache/
+#заполнить репозиторий пакетами из iso образа скопированными в /srv/share/www/debian12/cache/
 reprepro --ask-passphrase -Vb /srv/share/www/debian12/repo includedeb  bookworm /srv/share/www/debian12/cache/*.deb
 reprepro --ask-passphrase -Vb /srv/share/www/debian12/repo includeudeb bookworm /srv/share/www/debian12/cache/*.udeb
-# создаем символьную ссылку
+#создаем символьную ссылку
 ln -s /srv/share/www/debian12/repo/dists/bookworm /srv/share/www/debian12/repo/dists/stable
-# удалить ненужные каталоги, можно и не удалять, но каталог cache очень большой и будет дублировать пакеты которые скопированы в pool. Предлагаю оставить вдруг с первого раза не получится!
-# rm -rf  /srv/share/www/debian12/repo/{cache,conf,db}
-# Обновить файл с контрольными суммами
+#удалить ненужные каталоги, можно и не удалять, но каталог cache очень большой и будет дублировать пакеты которые скопированы в pool. Предлагаю оставить вдруг с первого раза не получится!
+#rm -rf  /srv/share/www/debian12/repo/{cache,conf,db}
+#Обновить файл с контрольными суммами
 cd /srv/share/www/debian12/repo
 find ! -name md5sum.txt ! -name gostsums.txt -follow -type f -print0 | xargs -0 md5sum > md5sum.txt ;
-# объявляем владельцем каталога на www-data
+#объявляем владельцем каталога на www-data
 chown -R www-data:www-data /srv/share/www
-# для проверки подписи репозитория нашим ключем и объединенным нужно выполнить команды
+#для проверки подписи репозитория нашим ключем и объединенным нужно выполнить команды
 gpg --no-default-keyring --keyring /srv/share/www/debian12/public.pgp --verify /srv/share/www/debian12/repo/dists/bookworm/Release.gpg /srv/share/www/debian12/repo/dists/bookworm/Release
 gpg --no-default-keyring --keyring /srv/share/www/debian12/debian-archive-keyring.gpg --verify /srv/share/www/debian12/repo/dists/bookworm/Release.gpg /srv/share/www/debian12/repo/dists/bookworm/Release
 #########################################################################################################
 12) файл ответов и файл boot.ipxe
-# сначала создаем boot.ipxe в /srv/share/ipxe/config
+#сначала создаем boot.ipxe в /srv/share/ipxe/config
 cd /srv/share/ipxe/config
 nano /srv/share/ipxe/config/boot.ipxe
-
+#текст ниже
 #!ipxe
 #dhcp
 set menu-timeout 50000
@@ -343,16 +344,18 @@ chain http://192.168.2.4/debian12/netboot/debian-installer/amd64/linux interface
 goto start
 
 # конец файла boot.ipxe
+#сохраняем  boot.ipxe
 #################################
-#генерация ssh ключа для подключения и вставки файла ответов, если хотим подключаться к машинам без пароля 
+#генерация ssh ключа для вставки в файл ответов, если хотим подключаться к машинам без пароля, выполнить на том ПК с которого хотим получать доступ.
 ssh-keygen -t ed25519
 # далее берем сгенерированный открытый ключ из файла, добавляем ключ в файлы ответов в строку d-i preseed/late_command string
-## далее файл ответов################
+## далее файл ответов
 # первый файл ответов для установки без GUI
 cd /srv/share/www/debian12
 nano /srv/share/www/debian12/preseed-install-cli.cfg
-#_preseed_V1
+#текст ниже
 
+#_preseed_V1
 # Локализация
 d-i debian-installer/language string ru
 d-i debian-installer/country string RU
@@ -391,8 +394,7 @@ d-i netcfg/hostname string debiantest
 d-i hw-detect/load_firmware boolean true
 
 ### Mirror settings
-# Если вы выберете ftp, указывать строку "зеркало"/"страна" не нужно.
-# Значение по умолчанию для зеркального протокола: http
+# Значение по умолчанию : http
 #d-i mirror/protocol string ftp
 d-i mirror/country string manual
 d-i mirror/http/hostname string 192.168.2.4
@@ -441,7 +443,7 @@ d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
-#Принудительно загрузите UEFI ("Совместимость с BIOS" будет потеряна). По умолчанию: false.
+#Принудительно загрузите UEFI ("Совместимость с BIOS" будет потеряна). По умолчанию: false. Закоментировать для поддержки BIOS Legacy
 d-i partman-efi/non_efi_system boolean true
 # Убедитесь, что таблица разделов является GPT - это необходимо для EFI
 d-i partman-partitioning/choose_label select gpt
@@ -454,7 +456,7 @@ d-i partman-partitioning/default_label string gpt
 d-i apt-setup/non-free-firmware boolean true
 # Вы можете выбрать установку несвободного или дополнительного программного обеспечения.
 d-i apt-setup/contrib boolean true
-# Доступны дополнительные репозитории, local[0-9]
+# Доступны дополнительные репозитории, local[0-9], не добавлять текущий с которого будет установка иначе задублируются в /etc/apt/source.list
 #d-i apt-setup/local0/repository string http://192.168.2.4/debian12/repo bookworm contrib main non-free-firmware
 #d-i apt-setup/local0/comment string local server Enable deb-src lines
 #d-i apt-setup/local0/source boolean true
@@ -479,12 +481,13 @@ d-i finish-install/reboot_in_progress note
 # дисков (которые могут быть невидимы при выполнении preseed/early_command).
 #d-i partman/early_command \
 #       string debconf-set partman-auto/disk "$(list-devices disk | head -n1)"
+#добавим нашу подпись репозитория во вновь установленную систему
 d-i partman/early_command string \
 wget -O /tmp/apt_dak.gpg http://192.168.2.4/debian12/debian-archive-keyring.gpg; \
 echo -e "cp /tmp/apt_dak.gpg /target/tmp/apt_dak.gpg\nchroot /target /bin/bash -c '/bin/cp /tmp/apt_dak.gpg /etc/apt/trusted.gpg.d/'" > /usr/lib/apt-setup/generators/001add-key ; \
 chmod +x /usr/lib/apt-setup/generators/001add-key
 
-# выполняется после установки
+# выполняется после установки, настройка SSH
 d-i preseed/late_command string \
 in-target sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config; \
 in-target sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config; \
@@ -632,11 +635,11 @@ in-target sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /et
 in-target sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config; \
 in-target sh -c "echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpW2MP5VcpU7TIrPT6Fudf0sywcdE9buf9S0joK3s92 root@testpxe' > /root/.ssh/authorized_keys";
 
-
+################################################################################################################
 13) создаем виртуальную машину и тестируем
 14) После установки закоментировать ненужные строки в файле списка репозиториев /etc/apt/sources.list, оставить только свой сетевой репозиторий или добавить по необходимости репы яндекса.
 
-
+```
 
 
 
