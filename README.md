@@ -11,6 +11,7 @@
 # Приступим к настройке iPXE на нашей чситой установки Debian Bookworm!
 
 # 1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
+```
 cat > /etc/network/interfaces <<EOF
 #This file describes the network interfaces available on your system1
 #and how to activate them. For more information, see interfaces(5).
@@ -26,6 +27,7 @@ netmask 255.255.255.0
 gateway 192.168.2.2
 EOF
 ###########################################################################
+```
 # 2) Далее прописываем настройки нашего прокси для apt
 cat > \etc\apt\apt.conf <<EOF
 Acquire::http::proxy "http://192.168.2.2:3128";
