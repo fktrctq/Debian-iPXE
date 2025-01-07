@@ -10,7 +10,7 @@
 # 192.168.2.4 - непосредственно наш будущий iPXE сервер
 # Приступим к настройке iPXE на нашей чситой установки Debian Bookworm!
 
-1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
+# 1)Конфигурация сетевого интерфейса. У меня enp6s18, для просмотра своего выполните ip a или ip l
 cat > /etc/network/interfaces <<EOF
 #This file describes the network interfaces available on your system1
 #and how to activate them. For more information, see interfaces(5).
@@ -26,8 +26,7 @@ netmask 255.255.255.0
 gateway 192.168.2.2
 EOF
 ###########################################################################
-2)
-Далее прописываем настройки нашего прокси для apt
+# 2) Далее прописываем настройки нашего прокси для apt
 cat > \etc\apt\apt.conf <<EOF
 Acquire::http::proxy "http://192.168.2.2:3128";
 Acquire::https::proxy "http://192.168.2.2:3128";
@@ -35,7 +34,7 @@ EOF
 
 #Далее настройки прокси для системы для всех пользователей.
 cat > /etc/profile.d/proxy.sh <<EOF
-# http/https
+#http/https
 export http_proxy="http://192.168.2.2:3128/"
 export https_proxy="http://192.168.2.2:3128/"
 EOF
@@ -46,9 +45,9 @@ echo "Запускаем proxy.sh"
 echo "Проверяем системные прокси"
 env | grep -i proxy
 ########################################################################
-3)Правим списки репозиториев
+# 3)Правим списки репозиториев
 cat >/etc/apt/sources.list<<EOF
-## добавляем репы яндекса для книжного червя
+#добавляем репы яндекса для книжного червя
 deb http://mirror.yandex.ru/debian/ bookworm main
 deb-src http://mirror.yandex.ru/debian/ bookworm main
 deb http://mirror.yandex.ru/debian-security bookworm-security main contrib
@@ -56,22 +55,21 @@ deb-src http://mirror.yandex.ru/debian-security bookworm-security main contrib
 deb http://mirror.yandex.ru/debian/ bookworm-updates main contrib
 deb-src http://mirror.yandex.ru/debian/ bookworm-updates main contrib
 EOF
-##
+#
 #запускаем 
 apt update  
 ##################################################################
-4)
-echo "Установка необходимого ПО для iPXE"
+# 4) Установка необходимого ПО для iPXE
 apt install -y dnsmasq nfs-kernel-server rsync git gcc make perl liblzma-dev mtools apache2 reprepro gpg
 ###########################################################
-5) создание каталогов для ipxe/tftp+nfs+apache
+# 5) создание каталогов для ipxe/tftp+nfs+apache
 mkdir -p /srv/share/{ipxe,nfs,www}
 echo "настройка NFS Добавляем конфигурацию в конец файла /etc/exports" NFS добавил для будущей поддержки других дистрибутивов Linux.
 echo "/srv/share/nfs *(rw,sync,no_wdelay,insecure_locks,no_root_squash,insecure,no_subtree_check)" >> /etc/exports
 #echo "Перезапуск демона nfs-kernel-server" или можно выполнить exportfs -av
 systemctl restart nfs-kernel-server
 ############################################################
-6)#Конфигурация файла  /etc/dnsmasq.conf interface=enp6s18 необходимо указать актуальный сетевой интерфейс, посмотреть можно выполнив ip a или ip l
+# 6)Конфигурация файла  /etc/dnsmasq.conf interface=enp6s18 необходимо указать актуальный сетевой интерфейс, посмотреть можно выполнив ip a или ip l
 cp /etc/dnsmasq.conf /etc/dnsmasq.conf.backup
 cat > /etc/dnsmasq.conf <<EOF
 interface=enp6s18
@@ -83,18 +81,18 @@ dhcp-option=option:dns-server,192.168.2.4
 dhcp-leasefile=/var/lib/misc/dnsmasq.leases
 enable-tftp
 tftp-root=/srv/share/ipxe
-# boot config for BIOS systems
+#boot config for BIOS systems
 dhcp-match=set:bios-x86,option:client-arch,0
 dhcp-boot=tag:bios-x86,firmware/ipxe.pxe
-# boot config for UEFI systems
+#boot config for UEFI systems
 dhcp-match=set:efi-x86_64,option:client-arch,7
 dhcp-match=set:efi-x86_64,option:client-arch,9
 dhcp-boot=tag:efi-x86_64,firmware/ipxe.efi
 EOF
-# Перезапускаем dnsmasq
+#Перезапускаем dnsmasq
 systemctl restart dnsmasq
 ##############################################################
-7)настройка apache2
+# 7)настройка apache2
 cat > /etc/apache2/sites-available/debpxe.conf <<EOF
 <VirtualHost *:80>
   ServerAdmin webmaster@localhost
@@ -108,41 +106,41 @@ cat > /etc/apache2/sites-available/debpxe.conf <<EOF
   CustomLog ${APACHE_LOG_DIR}/DebPXEaccess.log combined
 </VirtualHost>
 EOF
-# отключение дефолтной и включени нашей конфигурации + перезапуск демона apache2
+#отключение дефолтной и включени нашей конфигурации + перезапуск демона apache2
 #(Выключайм конфигурацию по умолчанию)
 a2dissite 000-default.conf 
 #включаем нашу конфигурацию (если ошибка то создаем ссылку ln -s /etc/apache2/sites-available/debpxe.conf  /etc/apache2/sites-enabled/debpxe.conf после a2ensite debpxe.conf)
 a2ensite debpxe.conf 
 systemctl reload apache2
-# для проверки синтаксиса нашего файла конфигурации выполнить apache2ctl -t
+#для проверки синтаксиса нашего файла конфигурации выполнить apache2ctl -t
 ##########################################################
-8) установка и настройка iPXE. Клонируем проект с github
-###т.к. каталог для tftp /srv/share/ipxe создаем каталоги конфигурации для ipxe
+# 8) установка и настройка iPXE. Клонируем проект с github
+#т.к. каталог для tftp /srv/share/ipxe создаем каталоги конфигурации для ipxe
 mkdir -p /srv/share/ipxe/{config,firmware}
 mkdir /srv/tmp
 cd /srv/tmp
 git clone https://github.com/ipxe/ipxe.git
 cd /srv/tmp/ipxe/src
-# создаем скрипт
+#создаем скрипт
 cat > /srv/tmp/ipxe/src/bootconfig.ipxe <<EOF
 #!ipxe
 dhcp
 chain tftp://192.168.2.4/config/boot.ipxe
 EOF
 
-# делаем бэкапы и редактируем файлы /srv/tmp/ipxe/src/config/general.h и  /srv/tmp/ipxe/src/config/console.h
+#делаем бэкапы и редактируем файлы /srv/tmp/ipxe/src/config/general.h и  /srv/tmp/ipxe/src/config/console.h
 cp /srv/tmp/ipxe/src/config/console.h /srv/tmp/ipxe/src/config/console.h.backup
 cp /srv/tmp/ipxe/src/config/general.h /srv/tmp/ipxe/src/config/general.h.backup
-# раскоментируем строки для включения необходимых функций для iPXE в файлах general.h и console.h
-# define DOWNLOAD_PROTO_TFTP  
-# define DOWNLOAD_PROTO_HTTP      
-# define PING_CMD
-# define IPSTAT_CMD
-# define REBOOT_CMD
-# define POWEROFF
-# define CONSOLE_CMD
-# undef  DOWNLOAD_PROTO_NFS
-# define       CONSOLE_FRAMEBUFFER
+#раскоментируем строки для включения необходимых функций для iPXE в файлах general.h и console.h
+#define DOWNLOAD_PROTO_TFTP  
+#define DOWNLOAD_PROTO_HTTP      
+#define PING_CMD
+#define IPSTAT_CMD
+#define REBOOT_CMD
+#define POWEROFF
+#define CONSOLE_CMD
+#undef  DOWNLOAD_PROTO_NFS
+#define       CONSOLE_FRAMEBUFFER
 
 sed -i 's/#undef.*DOWNLOAD_PROTO_NFS/#define	DOWNLOAD_PROTO_NFS/' /srv/tmp/ipxe/src/config/general.h
 sed -i 's/\/\/#define.*DOWNLOAD_PROTO_HTTP/#define DOWNLOAD_PROTO_HTTP/' /srv/tmp/ipxe/src/config/general.h
@@ -155,10 +153,10 @@ sed -i 's/\/\/#define.*CONSOLE_CMD/#define CONSOLE_CMD/' /srv/tmp/ipxe/src/confi
 sed -i 's/\/\/#define.*CONSOLE_FRAMEBUFFER/#define	CONSOLE_FRAMEBUFFER/' /srv/tmp/ipxe/src/config/console.h
 
 
-# Далее запускаем компиляцию файлов. Много файлов
+#Далее запускаем компиляцию файлов. Много файлов
 cd /srv/tmp/ipxe/src
 make bin/ipxe.pxe bin/undionly.kpxe bin/undionly.kkpxe bin/undionly.kkkpxe bin-x86_64-efi/ipxe.efi EMBED=bootconfig.ipxe
-# Копируем файлы для ipxe
+#Копируем файлы для ipxe
 cp -v bin/{ipxe.pxe,undionly.kpxe,undionly.kkpxe,undionly.kkkpxe} bin-x86_64-efi/ipxe.efi /srv/share/ipxe/firmware
 ##########################################################################
 ######################################################################
